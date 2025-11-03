@@ -72,7 +72,7 @@ class AthleteSearcher:
         variations.append(''.join(parts))
         return list(dict.fromkeys(variations))
     
-    @st.cache_data(ttl=CACHE_DURATION)
+    # REMOVED @st.cache_data
     def fetch_athlete_page(self, slug):
         url = f"https://www.onefc.com/athletes/{slug}/"
         try:
@@ -118,7 +118,7 @@ class AthleteSearcher:
         except Exception as e:
             return [f"Error: {str(e)}"]
     
-    @st.cache_data(ttl=CACHE_DURATION)
+    # REMOVED @st.cache_data
     def fetch_localized_name(self, slug, lang_code=""):
         if lang_code:
             url = f"https://www.onefc.com/{lang_code}/athletes/{slug}/"
