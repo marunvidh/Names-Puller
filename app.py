@@ -38,6 +38,34 @@ LANGUAGES = {
     "Chinese": {"code": "cn", "flag": "🇨🇳"}
 }
 
+def extract_nickname_and_clean(full_name: str):
+    """
+    Extracts the nickname (between “curly” or "straight" quotes) and returns (clean_name, nickname).
+    Example: 'Fabricio “Wonder Boy” Andrade' -> ('Fabricio Andrade', 'Wonder Boy')
+    """
+    if not full_name or full_name == "Not found":
+        return full_name, "-"
+
+    text = full_name.strip()
+
+    # Try curly quotes first: “ … ”
+    m = re.search(r'“([^”]+)”', text)
+    if not m:
+        # Fall back to straight double quotes: " … "
+        m = re.search(r'"([^"]+)"', text)
+
+    if m:
+        nickname = m.group(1).strip()
+        # Remove the matched portion and normalize spaces
+        cleaned = (text[:m.start()] + text[m.end():]).strip()
+        cleaned = re.sub(r'\s{2,}', ' ', cleaned)  # collapse double spaces if any
+        cleaned = cleaned.replace(" ,", ",").strip()
+        if not cleaned:
+            cleaned = full_name  # safety fallback
+        return cleaned, nickname if nickname else "-"
+    else:
+        return text, "-"
+
 class AthleteSearcher:
     def __init__(self):
         self.session = requests.Session()
@@ -72,7 +100,7 @@ class AthleteSearcher:
         variations.append(''.join(parts))
         return list(dict.fromkeys(variations))
     
-    # REMOVED @st.cache_data
+    # No Streamlit caching decorators to avoid UnhashableParamError
     def fetch_athlete_page(self, slug):
         url = f"https://www.onefc.com/athletes/{slug}/"
         try:
@@ -118,8 +146,10 @@ class AthleteSearcher:
         except Exception as e:
             return [f"Error: {str(e)}"]
     
-    # REMOVED @st.cache_data
     def fetch_localized_name(self, slug, lang_code=""):
+        """
+        Returns (clean_name_without_nickname, nickname_or_dash)
+        """
         if lang_code:
             url = f"https://www.onefc.com/{lang_code}/athletes/{slug}/"
         else:
@@ -131,12 +161,20 @@ class AthleteSearcher:
                 soup = BeautifulSoup(response.content, 'html.parser')
                 h1 = soup.find('h1', {'class': 'use-letter-spacing-hint my-4'}) or soup.find('h1')
                 if h1:
-                    return h1.get_text(strip=True)
+                    full = h1.get_text(strip=True)
+                    return extract_nickname_and_clean(full)
         except:
             pass
-        return "Not found"
+        return "Not found", "-"
     
     def fetch_all_names(self, slug):
+        """
+        Returns dict:
+        {
+          "English": {"name": "<clean>", "nickname": "<nick|->"},
+          "Thai": {...}, ...
+        }
+        """
         results = {}
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             future_to_lang = {
@@ -146,9 +184,10 @@ class AthleteSearcher:
             for future in as_completed(future_to_lang):
                 lang = future_to_lang[future]
                 try:
-                    results[lang] = future.result()
+                    clean_name, nick = future.result()
+                    results[lang] = {"name": clean_name, "nickname": nick}
                 except:
-                    results[lang] = "Error"
+                    results[lang] = {"name": "Error", "nickname": "-"}
         return results
 
 def search_athletes(names, searcher):
@@ -168,22 +207,38 @@ def search_athletes(names, searcher):
             flags = [COUNTRY_FLAGS.get(c, "🏳️") for c in countries]
             nationality_str = " / ".join(f"{f} {c}" for c, f in zip(countries, flags))
             name_data = searcher.fetch_all_names(slug)
-            
+
+            # Consolidated nickname: first available (prefer English), else from any lang
+            nickname = "-"
+            # prefer English if present
+            if "English" in name_data and name_data["English"]["nickname"] not in ("-", "", "Not found"):
+                nickname = name_data["English"]["nickname"]
+            else:
+                # fall back to first non-empty nickname among other languages
+                for lang in LANGUAGES.keys():
+                    if lang in name_data and name_data[lang]["nickname"] not in ("-", "", "Not found"):
+                        nickname = name_data[lang]["nickname"]
+                        break
+
+            # Build result row with cleaned names only (no nicknames)
             result = {
                 "Query": name,
                 "Status": "✅",
+                "Nickname": nickname,
                 "Nationality": nationality_str,
-                **{f"{lang} {LANGUAGES[lang]['flag']}": name_data.get(lang, "N/A") 
-                   for lang in LANGUAGES.keys()},
+                **{
+                    f"{lang} {LANGUAGES[lang]['flag']}": name_data.get(lang, {}).get("name", "N/A")
+                    for lang in LANGUAGES.keys()
+                },
                 "Profile": f"https://www.onefc.com/athletes/{slug}/"
             }
         else:
             result = {
                 "Query": name,
                 "Status": "❌",
+                "Nickname": "-",
                 "Nationality": "-",
-                **{f"{lang} {LANGUAGES[lang]['flag']}": "-" 
-                   for lang in LANGUAGES.keys()},
+                **{f"{lang} {LANGUAGES[lang]['flag']}": "-" for lang in LANGUAGES.keys()},
                 "Profile": "-"
             }
         
@@ -255,6 +310,7 @@ def main():
                 "Profile": st.column_config.LinkColumn("Profile", help="Click to view profile"),
                 "Status": st.column_config.TextColumn("Status", width="small"),
                 "Query": st.column_config.TextColumn("Search Query", width="medium"),
+                "Nickname": st.column_config.TextColumn("Nickname", width="medium"),
             }
             
             st.dataframe(df, column_config=column_config, hide_index=True, use_container_width=True)
