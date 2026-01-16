@@ -13,7 +13,7 @@ import concurrent.futures
 # 0. PAGE CONFIGURATION
 # ==========================================
 st.set_page_config(
-    page_title="ONE FC Data Scraper (With Retry)",
+    page_title="ONE Names Extractor (Creative)",
     page_icon="🥊",
     layout="wide"
 )
@@ -150,7 +150,7 @@ def fetch_athlete_data(url):
 # 2. UI LAYOUT
 # ==========================================
 
-st.title("🥊 ONE FC Scraper (With Retry & Country)")
+st.title("ONE Names Extractor (Creative)")
 
 input_raw = st.text_area(
     "Paste List (Names or URLs)", 
