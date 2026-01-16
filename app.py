@@ -15,31 +15,29 @@ import concurrent.futures
 st.set_page_config(
     page_title="ONE Names Extractor",
     page_icon="🥊",
-    layout="centered"  # This helps center elements by default
+    layout="wide"  # Changed to "wide" to let the table adapt to screen size
 )
 
 # ==========================================
-# 1. VISUAL STYLING (Clean & Centered 960px)
+# 1. VISUAL STYLING (Clean & Adaptive)
 # ==========================================
 st.markdown("""
     <style>
-    /* 1. Center the main block and limit width to 960px */
+    /* 1. Remove extra top padding */
     .block-container {
-        max_width: 960px;
         padding-top: 2rem;
         padding-bottom: 2rem;
-        margin: auto;
     }
-
-    /* 2. Remove extra padding from top to make it look tighter */
+    
     header {visibility: hidden;}
     
-    /* 3. Button Styling (Clean Default) */
+    /* 2. Button Styling */
     div.stButton > button:first-child {
         width: 100%;
+        font-weight: bold;
     }
     
-    /* 4. Table Styling - Ensure it uses available space */
+    /* 3. Table Styling */
     div[data-testid="stDataFrame"] {
         width: 100%;
     }
@@ -171,99 +169,116 @@ def fetch_athlete_data(url):
 # ==========================================
 
 st.title("ONE Names Extractor")
-st.write("Enter a list of athlete names or profile URLs below.")
 
-input_raw = st.text_area(
-    "Input Data", 
-    placeholder="Rodtang Jitmuangnon\nSuperlek Kiatmoo9\nhttps://www.onefc.com/athletes/stamp-fairtex/",
-    height=150,
-    label_visibility="collapsed"
-)
-
-if st.button("Generate Table", type="primary"):
-    if not input_raw.strip():
-        st.error("Please paste some names first.")
-    else:
-        entries = [e.strip() for e in re.split(r'[,\n]', input_raw) if e.strip()]
-        entries = list(set(entries))
-        
-        master_data = []
-        retry_queue = []
-        
-        progress_bar = st.progress(0)
-        status = st.empty()
-        
-        # --- PHASE 1 ---
-        total_items = len(entries)
-        for i, entry in enumerate(entries):
-            status.text(f"Scanning: {entry}...")
-            url = search_onefc_link(entry)
-            
-            success = False
-            if url:
-                data = fetch_athlete_data(url)
-                if data and data['names_map'].get('EN'):
-                    names = data['names_map']
-                    en_clean, nickname = extract_nickname_and_clean(names.get('EN', ''))
-                    th_clean, _ = extract_nickname_and_clean(names.get('TH', ''))
-                    jp_clean, _ = extract_nickname_and_clean(names.get('JP', ''))
-                    sc_clean, _ = extract_nickname_and_clean(names.get('SC', ''))
+# Using a container to limit input width so it doesn't stretch too wide
+with st.container():
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        st.write("Enter a list of athlete names or profile URLs below.")
+        input_raw = st.text_area(
+            "Input Data", 
+            placeholder="Rodtang Jitmuangnon\nSuperlek Kiatmoo9\nhttps://www.onefc.com/athletes/stamp-fairtex/",
+            height=200,
+            label_visibility="collapsed"
+        )
+        if st.button("Generate Table", type="primary"):
+            if not input_raw.strip():
+                st.error("Please paste some names first.")
+            else:
+                entries = [e.strip() for e in re.split(r'[,\n]', input_raw) if e.strip()]
+                entries = list(set(entries))
+                
+                master_data = []
+                retry_queue = []
+                
+                progress_bar = st.progress(0)
+                status = st.empty()
+                
+                # --- PHASE 1 ---
+                total_items = len(entries)
+                for i, entry in enumerate(entries):
+                    status.text(f"Scanning: {entry}...")
+                    url = search_onefc_link(entry)
                     
-                    master_data.append({
-                        "Name": en_clean,
-                        "Nickname": nickname,
-                        "Country": data['country'],
-                        "TH": th_clean,
-                        "JP": jp_clean,
-                        "SC": sc_clean,
-                        "URL": url
-                    })
-                    success = True
-            
-            if not success:
-                retry_queue.append(entry)
-            progress_bar.progress((i + 1) / total_items)
+                    success = False
+                    if url:
+                        data = fetch_athlete_data(url)
+                        if data and data['names_map'].get('EN'):
+                            names = data['names_map']
+                            en_clean, nickname = extract_nickname_and_clean(names.get('EN', ''))
+                            th_clean, _ = extract_nickname_and_clean(names.get('TH', ''))
+                            jp_clean, _ = extract_nickname_and_clean(names.get('JP', ''))
+                            sc_clean, _ = extract_nickname_and_clean(names.get('SC', ''))
+                            
+                            master_data.append({
+                                "Name": en_clean,
+                                "Nickname": nickname,
+                                "Country": data['country'],
+                                "TH": th_clean,
+                                "JP": jp_clean,
+                                "SC": sc_clean,
+                                "URL": url
+                            })
+                            success = True
+                    
+                    if not success:
+                        retry_queue.append(entry)
+                    progress_bar.progress((i + 1) / total_items)
 
-        # --- PHASE 2 (Retry) ---
-        if retry_queue:
-            status.text(f"Retrying {len(retry_queue)} items...")
-            time.sleep(1)
-            for i, entry in enumerate(retry_queue):
-                url = search_onefc_link(entry)
-                if url:
-                    data = fetch_athlete_data(url)
-                    if data and data['names_map'].get('EN'):
-                        names = data['names_map']
-                        en_clean, nickname = extract_nickname_and_clean(names.get('EN', ''))
-                        th_clean, _ = extract_nickname_and_clean(names.get('TH', ''))
-                        jp_clean, _ = extract_nickname_and_clean(names.get('JP', ''))
-                        sc_clean, _ = extract_nickname_and_clean(names.get('SC', ''))
-                        
-                        master_data.append({
-                            "Name": en_clean,
-                            "Nickname": nickname,
-                            "Country": data['country'],
-                            "TH": th_clean,
-                            "JP": jp_clean,
-                            "SC": sc_clean,
-                            "URL": url
-                        })
+                # --- PHASE 2 (Retry) ---
+                if retry_queue:
+                    status.text(f"Retrying {len(retry_queue)} items...")
+                    time.sleep(1)
+                    for i, entry in enumerate(retry_queue):
+                        url = search_onefc_link(entry)
+                        if url:
+                            data = fetch_athlete_data(url)
+                            if data and data['names_map'].get('EN'):
+                                names = data['names_map']
+                                en_clean, nickname = extract_nickname_and_clean(names.get('EN', ''))
+                                th_clean, _ = extract_nickname_and_clean(names.get('TH', ''))
+                                jp_clean, _ = extract_nickname_and_clean(names.get('JP', ''))
+                                sc_clean, _ = extract_nickname_and_clean(names.get('SC', ''))
+                                
+                                master_data.append({
+                                    "Name": en_clean,
+                                    "Nickname": nickname,
+                                    "Country": data['country'],
+                                    "TH": th_clean,
+                                    "JP": jp_clean,
+                                    "SC": sc_clean,
+                                    "URL": url
+                                })
 
-        status.empty() # Clear status
-        
-        if master_data:
-            st.success("Processing Complete")
-            df = pd.DataFrame(master_data)
-            df = df[["Name", "Nickname", "Country", "TH", "JP", "SC", "URL"]]
-            
-            # Display Table (Full Width + Fixed Height)
-            st.dataframe(
-                df, 
-                use_container_width=True, 
-                height=600  # Adjust this value to fit your screen preference
-            )
-            
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button("Download CSV", csv, "onefc_data.csv", "text/csv", use_container_width=True)
-        else:
-            st.error("No valid data found.")
+                status.empty() # Clear status
+                
+                if master_data:
+                    st.success(f"Processing Complete ({len(master_data)} found)")
+                    df = pd.DataFrame(master_data)
+                    
+                    # Define desired columns
+                    cols_to_keep = ["Name", "Nickname", "Country", "TH", "JP", "SC", "URL"]
+                    
+                    # Check if columns are empty and drop them if so
+                    final_cols = []
+                    for col in cols_to_keep:
+                        if col in df.columns:
+                            # If ANY row has content, keep the column.
+                            # We check if empty string or None exist
+                            has_data = df[col].replace("", pd.NA).notna().any()
+                            if has_data:
+                                final_cols.append(col)
+                    
+                    df_final = df[final_cols]
+
+                    # Display Table (Full Width + Fixed Height)
+                    st.dataframe(
+                        df_final, 
+                        use_container_width=True, 
+                        height=600
+                    )
+                    
+                    csv = df_final.to_csv(index=False).encode('utf-8')
+                    st.download_button("Download CSV", csv, "onefc_data.csv", "text/csv")
+                else:
+                    st.error("No valid data found.")
