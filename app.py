@@ -15,147 +15,33 @@ import concurrent.futures
 st.set_page_config(
     page_title="ONE Names Extractor",
     page_icon="🥊",
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    layout="centered"  # This helps center elements by default
 )
 
 # ==========================================
-# 1. VISUAL STYLING (WHITE THEME + ROBOTO + YELLOW ACCENTS)
+# 1. VISUAL STYLING (Clean & Centered 960px)
 # ==========================================
 st.markdown("""
     <style>
-    /* IMPORT ROBOTO FONT */
-    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700;900&display=swap');
-
-    /* GLOBAL RESET & FONT */
-    html, body, [class*="css"] {
-        font-family: 'Roboto', sans-serif;
-        color: #000000; 
+    /* 1. Center the main block and limit width to 960px */
+    .block-container {
+        max_width: 960px;
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        margin: auto;
     }
 
-    /* MAIN BACKGROUND (White) */
-    .stApp {
-        background-color: #ffffff;
-        color: #000000;
-    }
-
-    /* DECORATIVE YELLOW SHAPES (CSS Art) */
-    /* Shape 1: Top Right Yellow Circle/Blob */
-    .stApp::before {
-        content: "";
-        position: fixed;
-        top: -100px;
-        right: -100px;
-        width: 300px;
-        height: 300px;
-        background-color: #fece00;
-        border-radius: 50%;
-        z-index: 0;
-        opacity: 0.8;
-    }
+    /* 2. Remove extra padding from top to make it look tighter */
+    header {visibility: hidden;}
     
-    /* Shape 2: Bottom Left Yellow Triangle */
-    .stApp::after {
-        content: "";
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 0;
-        height: 0;
-        border-style: solid;
-        border-width: 150px 0 0 150px;
-        border-color: transparent transparent transparent #fece00;
-        z-index: 0;
-        opacity: 0.8;
-    }
-
-    /* INPUT TEXT AREA */
-    .stTextArea textarea {
-        background-color: #f0f0f0; /* Light gray for contrast against white */
-        color: #000000;
-        border: 2px solid #000000;
-        border-radius: 0px; /* Sharp corners for robust look */
-        font-family: 'Roboto', sans-serif;
-    }
-    .stTextArea textarea:focus {
-        border-color: #fece00;
-        box-shadow: 0 0 0 2px #fece00;
-    }
-    .stTextArea label {
-        color: #000000 !important;
-        font-weight: 700;
-    }
-
-    /* PRIMARY BUTTON (Yellow with Black Text) */
+    /* 3. Button Styling (Clean Default) */
     div.stButton > button:first-child {
-        background-color: #fece00;
-        color: #000000;
-        font-family: 'Roboto', sans-serif;
-        font-weight: 900;
-        font-size: 16px;
-        text-transform: uppercase;
-        border-radius: 0px;
-        border: 2px solid #000000;
-        padding: 12px 28px;
-        box-shadow: 4px 4px 0px #000000; /* Retro shadow effect */
-        transition: all 0.2s ease;
-        z-index: 1;
-    }
-    div.stButton > button:first-child:hover {
-        transform: translate(2px, 2px);
-        box-shadow: 2px 2px 0px #000000;
-        background-color: #ffdb4d;
-        color: #000000;
-        border: 2px solid #000000;
-    }
-
-    /* DOWNLOAD BUTTON */
-    div.stDownloadButton > button:first-child {
-        background-color: #ffffff;
-        color: #000000;
-        border: 2px solid #000000;
-        font-family: 'Roboto', sans-serif;
-        font-weight: 700;
-        text-transform: uppercase;
-        border-radius: 0px;
-        box-shadow: 4px 4px 0px #fece00;
-    }
-    div.stDownloadButton > button:first-child:hover {
-        background-color: #fece00;
-        color: #000000;
-        transform: translate(2px, 2px);
-        box-shadow: 2px 2px 0px #000000;
-    }
-
-    /* HEADERS & TEXT */
-    h1, h2, h3 {
-        color: #000000 !important;
-        font-family: 'Roboto', sans-serif;
-        font-weight: 900; /* Black weight */
-        text-transform: uppercase;
-        letter-spacing: -1px;
+        width: 100%;
     }
     
-    /* DATAFRAME / TABLE */
+    /* 4. Table Styling - Ensure it uses available space */
     div[data-testid="stDataFrame"] {
-        border: 2px solid #000000;
-        background-color: #ffffff;
-    }
-    div[data-testid="stDataFrame"] div[class*="css"] {
-        color: #000000;
-    }
-
-    /* ALERTS */
-    .stAlert {
-        background-color: #fff8cc; /* Light yellow bg */
-        color: #000000;
-        border: 2px solid #000000;
-        border-left: 10px solid #fece00;
-    }
-    
-    /* PROGRESS BAR */
-    .stProgress > div > div > div > div {
-        background-color: #000000;
+        width: 100%;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -192,23 +78,22 @@ def search_onefc_link(query):
     query = query.strip()
     if not query: return None
     
-    # 1. Direct URL check
     if "onefc.com/athletes/" in query:
         return query
 
-    # 2. Slug Guessing (Full Name)
+    # Try Slug (Full Name)
     slug_full = query.lower().replace(" ", "-")
     url_full = f"https://www.onefc.com/athletes/{slug_full}/"
     if check_url_valid(url_full):
         return url_full
 
-    # 3. Slug Guessing (First Name only)
+    # Try Slug (First Name only)
     first_name_slug = query.split()[0].lower()
     url_first = f"https://www.onefc.com/athletes/{first_name_slug}/"
     if check_url_valid(url_first):
         return url_first
 
-    # 4. Site Search Fallback
+    # Search Fallback
     search_url = f"https://www.onefc.com/?s={quote_plus(query)}"
     try:
         r = session.get(search_url, timeout=10)
@@ -245,19 +130,15 @@ def fetch_athlete_data(url):
         "SC": f"https://www.onefc.com/cn/athletes/{slug}/"
     }
 
-    # Helper to fetch name and country (only from English)
     def fetch_page_content(link, is_main=False):
         data = {"name": "", "country": ""}
         try:
             r = session.get(link, timeout=10)
             if r.status_code == 200:
                 soup = BeautifulSoup(r.content, 'html.parser')
-                
-                # Get Name
                 h1 = soup.find('h1')
                 if h1: data["name"] = h1.get_text(strip=True)
                 
-                # Get Country (Only needed for English page usually)
                 if is_main:
                     attr_blocks = soup.select("div.attr")
                     for block in attr_blocks:
@@ -269,15 +150,12 @@ def fetch_athlete_data(url):
         except: pass
         return data
 
-    # Concurrently fetch all languages
     results = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        # Submit tasks
         future_to_lang = {
             executor.submit(fetch_page_content, link, lang=="EN"): lang 
             for lang, link in langs.items()
         }
-        
         for future in concurrent.futures.as_completed(future_to_lang):
             lang = future_to_lang[future]
             results[lang] = future.result()
@@ -285,34 +163,26 @@ def fetch_athlete_data(url):
     return {
         "url": url,
         "names_map": {k: v["name"] for k, v in results.items()},
-        "country": results["EN"]["country"] # Take country from English page
+        "country": results["EN"]["country"]
     }
 
 # ==========================================
 # 3. UI LAYOUT
 # ==========================================
 
-# Add a Logo or Branding Header
-st.markdown("<h1 style='color: #000000; font-size: 3em;'>ATHLETE DATA EXTRACTOR</h1>", unsafe_allow_html=True)
-st.markdown("<p style='font-size: 1.1em;'>Enter a list of athlete names or profile URLs below to extract multilingual data.</p>", unsafe_allow_html=True)
-
-st.write("") # Spacer
+st.title("ONE Names Extractor")
+st.write("Enter a list of athlete names or profile URLs below.")
 
 input_raw = st.text_area(
-    "INPUT DATA (One per line)", 
+    "Input Data", 
     placeholder="Rodtang Jitmuangnon\nSuperlek Kiatmoo9\nhttps://www.onefc.com/athletes/stamp-fairtex/",
-    height=200
+    height=150,
+    label_visibility="collapsed"
 )
 
-st.write("") # Spacer
-
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    search_clicked = st.button("SEARCH ATHLETES", type="primary", use_container_width=True)
-
-if search_clicked:
+if st.button("Generate Table", type="primary"):
     if not input_raw.strip():
-        st.error("⚠️ Please paste some names first.")
+        st.error("Please paste some names first.")
     else:
         entries = [e.strip() for e in re.split(r'[,\n]', input_raw) if e.strip()]
         entries = list(set(entries))
@@ -323,11 +193,10 @@ if search_clicked:
         progress_bar = st.progress(0)
         status = st.empty()
         
-        # --- PHASE 1: INITIAL PASS ---
+        # --- PHASE 1 ---
         total_items = len(entries)
-        
         for i, entry in enumerate(entries):
-            status.markdown(f"**SCANNING:** `{entry}`")
+            status.text(f"Scanning: {entry}...")
             url = search_onefc_link(entry)
             
             success = False
@@ -353,18 +222,14 @@ if search_clicked:
             
             if not success:
                 retry_queue.append(entry)
-            
             progress_bar.progress((i + 1) / total_items)
 
-        # --- PHASE 2: RETRY PASS ---
+        # --- PHASE 2 (Retry) ---
         if retry_queue:
-            status.markdown(f"⏳ **RETRYING {len(retry_queue)} FAILED ITEMS...**")
-            time.sleep(1) 
-            
+            status.text(f"Retrying {len(retry_queue)} items...")
+            time.sleep(1)
             for i, entry in enumerate(retry_queue):
-                status.markdown(f"**RETRY SCAN:** `{entry}`")
                 url = search_onefc_link(entry)
-                
                 if url:
                     data = fetch_athlete_data(url)
                     if data and data['names_map'].get('EN'):
@@ -384,25 +249,21 @@ if search_clicked:
                             "URL": url
                         })
 
-        status.success("✅ **PROCESSING COMPLETE**")
+        status.empty() # Clear status
         
-        # --- DISPLAY ---
         if master_data:
+            st.success("Processing Complete")
             df = pd.DataFrame(master_data)
             df = df[["Name", "Nickname", "Country", "TH", "JP", "SC", "URL"]]
             
-            st.markdown("### EXTRACTED DATA")
-            st.dataframe(df, use_container_width=True)
+            # Display Table (Full Width + Fixed Height)
+            st.dataframe(
+                df, 
+                use_container_width=True, 
+                height=600  # Adjust this value to fit your screen preference
+            )
             
             csv = df.to_csv(index=False).encode('utf-8')
-            
-            st.write("")
-            st.download_button(
-                "DOWNLOAD CSV FILE", 
-                csv, 
-                "onefc_data.csv", 
-                "text/csv",
-                use_container_width=True
-            )
+            st.download_button("Download CSV", csv, "onefc_data.csv", "text/csv", use_container_width=True)
         else:
-            st.error("No valid data found. Please check spelling or try direct URLs.")
+            st.error("No valid data found.")
