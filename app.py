@@ -154,7 +154,7 @@ st.title("ONE Names Extractor (Creative)")
 
 input_raw = st.text_area(
     "Paste List (Names or URLs)", 
-    placeholder="Rodtang Jitmuangnon\nSuperlek\nhttps://www.onefc.com/athletes/stamp-fairtex/",
+    placeholder="Paste your names here",
     height=150
 )
 
