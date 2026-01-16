@@ -51,23 +51,25 @@ st.markdown("""
         font-style: italic;
     }
     
-    /* 3. INPUT BOX STYLING */
-    div[data-baseweb="input"] > div {
+    /* 3. INPUT BOX STYLING (Text Area) */
+    .stTextArea textarea {
         background-color: #262730 !important;
         color: #ffffff !important;
         border: 1px solid #444;
         border-radius: 4px;
+        min-height: 68px; /* Fixed height for consistency */
     }
-    input {
-        color: #ffffff !important; 
+    .stTextArea textarea:focus {
+        border-color: #ff4b4b;
+        box-shadow: 0 0 0 1px #ff4b4b;
     }
     
-    /* 4. BUTTON STYLING (Full Height to match Input) */
+    /* 4. BUTTON STYLING (Aligned with Text Area) */
     div.stButton > button:first-child {
         background-color: #ff4b4b;
         color: white;
         border: none;
-        height: 2.6rem; /* Match standard input height */
+        height: 68px; /* MATCH TEXT AREA HEIGHT EXACTLY */
         padding: 0 2rem;
         border-radius: 4px;
         font-weight: bold;
@@ -208,18 +210,17 @@ def fetch_athlete_data(url):
 
 st.title("ONE Championship Athlete Search")
 st.markdown('<p class="subtext">Search for ONE Championship athletes and get their names in multiple languages</p>', unsafe_allow_html=True)
-st.markdown('<p class="instruction-text">Enter athlete names (separate with commas):</p>', unsafe_allow_html=True)
+st.markdown('<p class="instruction-text">Enter athlete names (separate with commas or new lines):</p>', unsafe_allow_html=True)
 
 # --- SEARCH ROW (Input + Button on same line) ---
-# Use a centered layout but with a wider ratio for the input box
-# [Spacer, Input Box (Large), Button (Small), Spacer]
 c1, c2, c3, c4 = st.columns([1, 6, 1, 1])
 
 with c2:
-    # label_visibility="collapsed" hides the label to align perfectly with button
-    input_raw = st.text_input("Search", placeholder="e.g. Rodtang, Superlek", label_visibility="collapsed")
+    # Changed to text_area to support line breaks
+    input_raw = st.text_area("Search", height=68, placeholder="Paste list here...", label_visibility="collapsed")
 
 with c3:
+    # Button height is forced to match text area via CSS
     run_search = st.button("SEARCH")
 
 # --- RESULTS AREA ---
