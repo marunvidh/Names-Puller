@@ -19,45 +19,70 @@ st.set_page_config(
 )
 
 # ==========================================
-# 1. VISUAL STYLING
+# 1. VISUAL STYLING (Dark Theme & Centering)
 # ==========================================
 st.markdown("""
     <style>
-    /* Remove extra header padding */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+    /* 1. FORCE DARK THEME */
+    .stApp {
+        background-color: #0e1117;
+        color: #ffffff;
     }
     
-    header {visibility: hidden;}
-    
-    /* Center the title */
+    /* 2. CENTER TITLES & TEXT */
     h1 {
         text-align: center;
-        font-size: 2.5rem;
-        margin-bottom: 0.5rem;
+        color: #ffffff !important;
+        font-family: sans-serif;
+        font-weight: 700;
+        padding-top: 1rem;
     }
-    
-    /* Center the subtext */
     .subtext {
         text-align: center;
-        font-size: 1.1rem;
-        color: #666;
-        margin-bottom: 1.5rem;
-    }
-
-    /* Button Styling */
-    div.stButton > button:first-child {
-        width: 100%;
-        font-weight: bold;
-        border-radius: 4px;
-        margin-top: 10px;
+        color: #888888;
+        font-size: 1rem;
+        margin-bottom: 2rem;
     }
     
-    /* Input Styling - Minimalist */
+    /* 3. INPUT BOX STYLING (High Contrast) */
     .stTextArea textarea {
-        font-size: 14px;
-        color: #333;
+        background-color: #262730 !important;
+        color: #ffffff !important; /* TEXT IS WHITE */
+        caret-color: #ffffff;
+        border: 1px solid #444;
+        border-radius: 8px;
+    }
+    .stTextArea textarea:focus {
+        border-color: #ff4b4b;
+        box-shadow: 0 0 0 1px #ff4b4b;
+    }
+    
+    /* 4. BUTTON STYLING & CENTERING */
+    div.stButton {
+        text-align: center;
+        display: flex;
+        justify_content: center;
+        margin-top: 10px;
+    }
+    div.stButton > button:first-child {
+        background-color: #ff4b4b;
+        color: white;
+        border: none;
+        padding: 0.5rem 2rem;
+        border-radius: 4px;
+        font-weight: bold;
+        width: 100%; 
+    }
+    div.stButton > button:first-child:hover {
+        background-color: #ff3333;
+        color: white;
+        border: none;
+    }
+
+    /* 5. TABLE STYLING */
+    div[data-testid="stDataFrame"] {
+        width: 100%;
+        margin-top: 2rem;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -72,7 +97,6 @@ HEADERS = {
 
 @st.cache_resource
 def get_session():
-    """Creates a persistent requests session with retry logic."""
     session = requests.Session()
     session.headers.update(HEADERS)
     retry = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
@@ -93,21 +117,17 @@ def check_url_valid(url):
 def search_onefc_link(query):
     query = query.strip()
     if not query: return None
-    
-    if "onefc.com/athletes/" in query:
-        return query
+    if "onefc.com/athletes/" in query: return query
 
     # Try Slug (Full Name)
     slug_full = query.lower().replace(" ", "-")
     url_full = f"https://www.onefc.com/athletes/{slug_full}/"
-    if check_url_valid(url_full):
-        return url_full
+    if check_url_valid(url_full): return url_full
 
     # Try Slug (First Name only)
     first_name_slug = query.split()[0].lower()
     url_first = f"https://www.onefc.com/athletes/{first_name_slug}/"
-    if check_url_valid(url_first):
-        return url_first
+    if check_url_valid(url_first): return url_first
 
     # Search Fallback
     search_url = f"https://www.onefc.com/?s={quote_plus(query)}"
@@ -120,8 +140,7 @@ def search_onefc_link(query):
             href = link['href']
             if "/athletes/" in href and href.count('/') >= 4:
                 return href
-    except:
-        pass
+    except: pass
     return None
 
 def extract_nickname_and_clean(raw_name):
@@ -183,27 +202,27 @@ def fetch_athlete_data(url):
     }
 
 # ==========================================
-# 3. UI LAYOUT (TOP CENTER ALIGN)
+# 3. UI LAYOUT (CENTERED)
 # ==========================================
 
 st.title("ONEFC Global Name Search")
 st.markdown('<p class="subtext">Input Names to start..</p>', unsafe_allow_html=True)
 
-# Center the search bar using columns
-# col1 (Spacer), col2 (Content), col3 (Spacer)
+# --- CENTERED CONTAINER ---
 left, center, right = st.columns([1, 2, 1])
 
 with center:
     input_raw = st.text_area(
         "Search", 
         value="", 
-        height=68, # Minimal height (approx 1 line appearance)
-        placeholder="", # Removed placeholder
+        height=68, 
+        placeholder="", 
         label_visibility="collapsed"
     )
     
-    run_search = st.button("SEARCH", type="primary")
+    run_search = st.button("SEARCH")
 
+# --- RESULTS AREA ---
 if run_search:
     if not input_raw.strip():
         st.error("Please paste some names first.")
@@ -276,33 +295,33 @@ if run_search:
         status.empty() # Clear status
         
         if master_data:
-            # Force standard columns even if empty
+            # Force standard columns
             cols_standard = ["Name", "Nickname", "Country", "TH", "JP", "SC", "URL"]
             
             df = pd.DataFrame(master_data)
-            
-            # Ensure all columns exist (fill missing with empty strings)
             for col in cols_standard:
                 if col not in df.columns:
                     df[col] = ""
-            
-            # Reorder
             df = df[cols_standard]
             
-            st.success(f"Processing Complete ({len(master_data)} found)")
-            
-            # Display Table (Full Width)
+            # --- DISPLAY TABLE (Auto Height & Clickable Links) ---
             st.dataframe(
-                df, 
-                use_container_width=True, 
-                height=600
+                df,
+                use_container_width=True,
+                column_config={
+                    "URL": st.column_config.LinkColumn(
+                        "ONEFC Link", 
+                        display_text="Open Profile" # or remove this line to show full URL
+                    )
+                },
+                hide_index=True
             )
             
             csv = df.to_csv(index=False).encode('utf-8')
             
-            # Center the download button
-            dl_col1, dl_col2, dl_col3 = st.columns([1, 2, 1])
-            with dl_col2:
+            # Centered Download Button
+            dl_left, dl_center, dl_right = st.columns([1, 2, 1])
+            with dl_center:
                 st.download_button("Download CSV", csv, "onefc_global_names.csv", "text/csv", use_container_width=True)
         else:
             st.error("No valid data found.")
