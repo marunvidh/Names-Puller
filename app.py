@@ -158,7 +158,7 @@ input_raw = st.text_area(
     height=150
 )
 
-if st.button("🚀 Generate Table", type="primary"):
+if st.button("Search", type="primary"):
     if not input_raw.strip():
         st.error("⚠️ Please paste some names first.")
     else:
