@@ -9,229 +9,228 @@ import time
 import re
 import concurrent.futures
 
-# --- CONFIGURATION & ASSETS ---
-st.set_page_config(page_title="ONE Athlete Profile", page_icon="🥊", layout="wide")
+# ==========================================
+# 0. PAGE CONFIGURATION
+# ==========================================
+st.set_page_config(
+    page_title="ONE FC Name Scraper",
+    page_icon="🥊",
+    layout="wide"
+)
 
-# Headers to mimic a real browser
+# ==========================================
+# 1. SETUP & UTILS
+# ==========================================
+# Headers to mimic a real browser to avoid 403 errors
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept-Language': 'en-US,en;q=0.9',
 }
 
-# Country Flags Dictionary (Same as before)
-COUNTRY_FLAGS = {
-    "Thailand": "🇹🇭", "Philippines": "🇵🇭", "Japan": "🇯🇵", "China": "🇨🇳", "Singapore": "🇸🇬",
-    "United States": "🇺🇸", "Malaysia": "🇲🇾", "Brazil": "🇧🇷", "India": "🇮🇳", "Russia": "🇷🇺",
-    "South Korea": "🇰🇷", "Vietnam": "🇻🇳", "France": "🇫🇷", "United Kingdom": "🇬🇧",
-    "Australia": "🇦🇺", "Germany": "🇩🇪", "Netherlands": "🇳🇱", "Italy": "🇮🇹", "Canada": "🇨🇦",
-    "Myanmar": "🇲🇲", "Indonesia": "🇮🇩", "Kazakhstan": "🇰🇿", "Ukraine": "🇺🇦", "Turkey": "🇹🇷",
-    "Iran": "🇮🇷", "Belarus": "🇧🇾", "Sweden": "🇸🇪", "Norway": "🇳🇴", "Denmark": "🇩🇰",
-    "Finland": "🇫🇮", "Poland": "🇵🇱", "Mongolia": "🇲🇳", "Spain": "🇪🇸", "Portugal": "🇵🇹",
-    "Cambodia": "🇰🇭", "Laos": "🇱🇦", "Taiwan": "🇹🇼", "Hong Kong SAR China": "🇭🇰",
-    "Algeria": "🇩🇿", "Morocco": "🇲🇦", "South Africa": "🇿🇦", "Argentina": "🇦🇷",
-    # Add other flags as needed...
-}
-
-# --- NETWORK SESSION SETUP ---
+@st.cache_resource
 def get_session():
-    """
-    Creates a requests session with retries and browser headers.
-    This helps prevent 'No Results' due to network blips or rate limits.
-    """
+    """Creates a persistent requests session with retry logic."""
     session = requests.Session()
     session.headers.update(HEADERS)
-    
-    # Retry strategy: retry 3 times on connection errors or 5xx/429 server errors
-    retry = Retry(
-        total=3,
-        read=3,
-        connect=3,
-        backoff_factor=1, # Wait 1s, 2s, 4s between retries
-        status_forcelist=[429, 500, 502, 503, 504]
-    )
+    retry = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
     adapter = HTTPAdapter(max_retries=retry)
     session.mount('http://', adapter)
     session.mount('https://', adapter)
     return session
 
-# Initialize session
 session = get_session()
 
-# --- BACKEND LOGIC ---
+def check_url_valid(url):
+    """Checks if a URL returns a 200 OK status."""
+    try:
+        r = session.get(url, timeout=5)
+        return r.status_code == 200
+    except:
+        return False
 
-@st.cache_data(ttl=3600)
 def search_onefc_link(query):
-    """
-    Smart Search:
-    1. Checks if input is already a URL.
-    2. Tries to guess the URL (e.g. "Rodtang" -> /athletes/rodtang/).
-    3. If guess fails, searches ONEFC.com search page for the link.
-    """
+    """Finds the athlete profile URL based on a name or string."""
     query = query.strip()
-    if not query:
-        return None
-
-    # 1. Is it already a link?
+    if not query: return None
+    
+    # 1. If user pasted a full URL, just return it
     if "onefc.com/athletes/" in query:
         return query
 
-    # 2. Try Direct Guess (Fastest)
-    # Convert "Rodtang Jitmuangnon" -> "rodtang-jitmuangnon"
-    slug = query.lower().replace(" ", "-")
-    direct_url = f"https://www.onefc.com/athletes/{slug}/"
-    
-    try:
-        # Use HEAD request to check if page exists without downloading body
-        r = session.head(direct_url, timeout=5)
-        if r.status_code == 200:
-            return direct_url
-    except:
-        pass # If error, move to search strategy
+    # 2. Try guessing the "slug" (e.g. "Rodtang Jitmuangnon" -> "rodtang-jitmuangnon")
+    slug_full = query.lower().replace(" ", "-")
+    url_full = f"https://www.onefc.com/athletes/{slug_full}/"
+    if check_url_valid(url_full):
+        return url_full
 
-    # 3. Search the Website (Slower but Smarter)
-    # This finds names where the slug doesn't match the name exactly
+    # 3. Try guessing just the first name (e.g. "Superlek")
+    first_name_slug = query.split()[0].lower()
+    url_first = f"https://www.onefc.com/athletes/{first_name_slug}/"
+    if check_url_valid(url_first):
+        return url_first
+
+    # 4. Fallback: Use the ONE FC search bar
     search_url = f"https://www.onefc.com/?s={quote_plus(query)}"
     try:
         r = session.get(search_url, timeout=10)
         soup = BeautifulSoup(r.content, 'html.parser')
         
-        # Find all links that point to an athlete profile
-        # We filter for hrefs containing "/athletes/" and avoid generic index pages
-        links = soup.find_all('a', href=True)
+        # Look for links that contain "/athletes/"
+        # We search inside the main content area to avoid footer/header links
+        main_area = soup.find('main') or soup.body
+        links = main_area.find_all('a', href=True)
+        
         for link in links:
             href = link['href']
-            # ONE FC structure: /athletes/slug/ (3 slashes after domain)
+            # Ensure it's an athlete profile, not a news article about them
             if "/athletes/" in href and href.count('/') >= 4:
                 return href
     except Exception as e:
-        print(f"Search error: {e}")
+        print(f"Search failed for {query}: {e}")
+        pass
         
     return None
 
-def fetch_athlete_data(url):
-    """
-    Fetches flags and localized names for a specific athlete URL.
-    """
-    if not url:
-        return None
-        
-    # Extract slug
-    parsed = urlparse(url)
-    # Handle trailing slashes carefully
-    path_parts = parsed.path.strip('/').split('/')
-    if not path_parts:
-        return None
-    slug = path_parts[-1].lower()
+def extract_nickname_and_clean(raw_name):
+    """Separates 'Name "Nickname" Surname' into parts."""
+    if not raw_name or raw_name in ["Name not found", "Not Available"]:
+        return "", ""
+
+    # Regex to find text inside quotes "..." or “...”
+    pattern = r'["“](.*?)["”]'
+    match = re.search(pattern, raw_name)
     
+    nickname = match.group(1) if match else ""
+    
+    # Remove the nickname from the full name
+    clean_name = re.sub(pattern, '', raw_name)
+    # Remove extra spaces
+    clean_name = " ".join(clean_name.split())
+    
+    return clean_name, nickname
+
+def fetch_athlete_data(url):
+    """Fetches names from EN, TH, JP, and CN versions of the page."""
+    if not url: return None
+    
+    # Extract slug from URL to build other language links
+    parsed = urlparse(url)
+    slug = parsed.path.strip('/').split('/')[-1].lower()
+    
+    # Define URL patterns for languages
     langs = {
-        "English": f"https://www.onefc.com/athletes/{slug}/",
-        "Thai": f"https://www.onefc.com/th/athletes/{slug}/",
-        "Japanese": f"https://www.onefc.com/jp/athletes/{slug}/",
-        "Chinese": f"https://www.onefc.com/cn/athletes/{slug}/"
+        "EN": f"https://www.onefc.com/athletes/{slug}/",
+        "TH": f"https://www.onefc.com/th/athletes/{slug}/",
+        "JP": f"https://www.onefc.com/jp/athletes/{slug}/",
+        "SC": f"https://www.onefc.com/cn/athletes/{slug}/" # Simplified Chinese
     }
 
-    # Helper for concurrent fetching
-    def fetch_single_lang(lang_url):
+    def fetch_single_name(link):
         try:
-            r = session.get(lang_url, timeout=10)
-            if r.status_code != 200:
-                return "Not Available"
-            soup = BeautifulSoup(r.content, 'html.parser')
-            h1 = soup.find('h1', {'class': 'use-letter-spacing-hint my-4'}) or soup.find('h1')
-            return h1.get_text(strip=True) if h1 else "Name not found"
-        except:
-            return "Error"
+            r = session.get(link, timeout=10)
+            if r.status_code == 200:
+                soup = BeautifulSoup(r.content, 'html.parser')
+                # Try finding the H1 tag (usually the athlete name)
+                h1 = soup.find('h1')
+                if h1:
+                    return h1.get_text(strip=True)
+        except: 
+            pass
+        return "" # Return empty string if failed
 
-    # 1. Fetch Nationality (English page)
-    countries = []
-    try:
-        r = session.get(langs["English"], timeout=10)
-        soup = BeautifulSoup(r.content, 'html.parser')
-        attr_blocks = soup.select("div.attr")
-        for block in attr_blocks:
-            title = block.find("h5", class_="title")
-            if title and "country" in title.get_text(strip=True).lower():
-                value = block.find("div", class_="value")
-                if value:
-                    countries = [a.get_text(strip=True) for a in value.find_all("a")]
-                break
-    except:
-        countries = ["Unknown"]
-
-    # 2. Fetch Names Concurrently (Speed boost)
-    names_data = {}
+    # Fetch all languages concurrently to save time
+    names_map = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        future_to_lang = {executor.submit(fetch_single_lang, link): lang for lang, link in langs.items()}
-        for future in concurrent.futures.as_completed(future_to_lang):
-            lang = future_to_lang[future]
-            names_data[lang] = future.result()
+        futures = {executor.submit(fetch_single_name, link): lang for lang, link in langs.items()}
+        for future in concurrent.futures.as_completed(futures):
+            names_map[futures[future]] = future.result()
 
-    # Format Flags
-    flags = [COUNTRY_FLAGS.get(c, "🏳️") for c in countries]
-    nationality_str = " ".join(f"{f} {c}" for c, f in zip(countries, flags))
+    return {"url": url, "names_map": names_map}
 
-    return {
-        "url": url,
-        "nationality": nationality_str,
-        "names": names_data,
-        "original_slug": slug
-    }
+# ==========================================
+# 2. UI LAYOUT
+# ==========================================
 
-# --- FRONTEND UI ---
+st.title("🥊 ONE FC Name Scraper")
 
-st.title("🥊 ONE Athlete Profile")
-
-with st.expander("ℹ️ How to use", expanded=False):
-    st.markdown("""
-    **Paste names or links below.**
-    - Separate multiple athletes using **Commas (`,`)** or **New Lines (Enter)**.
-    - You can type Full Names (e.g., `Rodtang Jitmuangnon`), Slugs (`rodtang`), or URLs.
-    """)
+st.markdown("""
+**Instructions:**
+1. Paste a list of names (e.g. *Rodtang, Superlek*) or ONEFC URLs.
+2. Click **Generate Table**.
+""")
 
 # Input Area
-default_text = "https://www.onefc.com/athletes/rodtang/\nSuperlek Kiatmoo9, John Lineker"
-raw_input = st.text_area("Input Data:", value=default_text, height=150)
+input_raw = st.text_area(
+    "Paste List (one per line)", 
+    placeholder="Rodtang Jitmuangnon\nSuperlek Kiatmoo9\nhttps://www.onefc.com/athletes/stamp-fairtex/",
+    height=150
+)
 
-if st.button("🔍 Search & Process"):
-    if not raw_input.strip():
-        st.warning("Please enter some names or links.")
+# Button
+if st.button("🚀 Generate Table", type="primary"):
+    if not input_raw.strip():
+        st.error("⚠️ Please paste some names first.")
     else:
-        # Split by Newline OR Comma
-        # re.split(r'[,\n]', text) handles both separators
-        entries = [e.strip() for e in re.split(r'[,\n]', raw_input) if e.strip()]
+        entries = [e.strip() for e in re.split(r'[,\n]', input_raw) if e.strip()]
+        entries = list(set(entries)) # Remove duplicates
         
-        # Remove duplicates
-        entries = list(set(entries))
+        master_data = []
         
-        st.write(f"Processing {len(entries)} athletes...")
+        # UI Elements for progress
         progress_bar = st.progress(0)
+        status_container = st.container()
         
-        for idx, entry in enumerate(entries):
-            # 1. Search
-            found_url = search_onefc_link(entry)
-            
-            if found_url:
-                # 2. Fetch
-                data = fetch_athlete_data(found_url)
+        with status_container:
+            for i, entry in enumerate(entries):
+                st.text(f"Processing ({i+1}/{len(entries)}): {entry}...")
                 
-                if data:
-                    # 3. Display Result Card
-                    with st.expander(f"✅ {data['names'].get('English', entry).upper()}", expanded=True):
-                        c1, c2 = st.columns([1, 2])
-                        with c1:
-                            st.markdown(f"**Nationality:**")
-                            st.info(data['nationality'])
-                            st.markdown(f"[🔗 Open Profile]({data['url']})")
-                        with c2:
-                            df = pd.DataFrame(data['names'].items(), columns=["Language", "Name"])
-                            st.dataframe(df, hide_index=True, use_container_width=True)
-                else:
-                    st.error(f"❌ Found link but failed to parse: {entry}")
-            else:
-                st.warning(f"⚠️ Could not find athlete: '{entry}' (Try using the exact full name or URL)")
+                # 1. Find URL
+                url = search_onefc_link(entry)
+                
+                if url:
+                    # 2. Fetch Data
+                    data = fetch_athlete_data(url)
+                    if data:
+                        names = data['names_map']
+                        
+                        # 3. Clean Strings
+                        en_clean, nickname = extract_nickname_and_clean(names.get('EN', ''))
+                        th_clean, _ = extract_nickname_and_clean(names.get('TH', ''))
+                        jp_clean, _ = extract_nickname_and_clean(names.get('JP', ''))
+                        sc_clean, _ = extract_nickname_and_clean(names.get('SC', ''))
+                        
+                        row = {
+                            "Search Term": entry,
+                            "Name (Clean)": en_clean,
+                            "Nickname": nickname,
+                            "TH": th_clean,
+                            "JP": jp_clean,
+                            "SC": sc_clean,
+                            "URL": url
+                        }
+                        master_data.append(row)
+                
+                # Update Progress
+                progress_bar.progress((i + 1) / len(entries))
+        
+        # Final Output
+        if master_data:
+            st.success(f"✅ Finished! Found data for {len(master_data)} athletes.")
             
-            # Update progress
-            progress_bar.progress((idx + 1) / len(entries))
-            time.sleep(0.2) # Small buffer to be polite to the server
-
-        st.success("All done!")
+            df = pd.DataFrame(master_data)
+            # Reorder columns
+            cols = ["Name (Clean)", "Nickname", "TH", "JP", "SC", "URL"]
+            df = df[cols]
+            
+            st.dataframe(df, use_container_width=True)
+            
+            # CSV Download
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv,
+                file_name='onefc_names.csv',
+                mime='text/csv',
+            )
+        else:
+            st.error("❌ No data found. The website might be blocking requests or the names are misspelled.")
