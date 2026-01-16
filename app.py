@@ -304,14 +304,25 @@ if run_search:
                     df[col] = ""
             df = df[cols_standard]
             
-            # --- DISPLAY TABLE (Auto Height & Clickable Links) ---
+            # --- HARDCODE ICONS INTO HEADERS ---
+            df = df.rename(columns={
+                "Name": "👤 Name",
+                "Nickname": "🥊 Nickname",
+                "Country": "🏳️ Country",
+                "TH": "🇹🇭 TH",
+                "JP": "🇯🇵 JP",
+                "SC": "🇨🇳 CN",
+                "URL": "🔗 Link"
+            })
+            
+            # --- DISPLAY TABLE (With Icons & Clickable Links) ---
             st.dataframe(
                 df,
                 use_container_width=True,
                 column_config={
-                    "URL": st.column_config.LinkColumn(
-                        "ONEFC Link", 
-                        display_text="Open Profile" # or remove this line to show full URL
+                    "🔗 Link": st.column_config.LinkColumn(
+                        "🔗 Link", 
+                        display_text="View Profile" 
                     )
                 },
                 hide_index=True
