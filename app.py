@@ -20,85 +20,142 @@ st.set_page_config(
 )
 
 # ==========================================
-# 1. VISUAL STYLING (ONE CHAMPIONSHIP THEME)
+# 1. VISUAL STYLING (WHITE THEME + ROBOTO + YELLOW ACCENTS)
 # ==========================================
-# This block injects Custom CSS to match the images provided
 st.markdown("""
     <style>
-    /* MAIN BACKGROUND */
+    /* IMPORT ROBOTO FONT */
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700;900&display=swap');
+
+    /* GLOBAL RESET & FONT */
+    html, body, [class*="css"] {
+        font-family: 'Roboto', sans-serif;
+        color: #000000; 
+    }
+
+    /* MAIN BACKGROUND (White) */
     .stApp {
-        background-color: #1a1a1a;
-        color: #ffffff;
+        background-color: #ffffff;
+        color: #000000;
+    }
+
+    /* DECORATIVE YELLOW SHAPES (CSS Art) */
+    /* Shape 1: Top Right Yellow Circle/Blob */
+    .stApp::before {
+        content: "";
+        position: fixed;
+        top: -100px;
+        right: -100px;
+        width: 300px;
+        height: 300px;
+        background-color: #fece00;
+        border-radius: 50%;
+        z-index: 0;
+        opacity: 0.8;
     }
     
+    /* Shape 2: Bottom Left Yellow Triangle */
+    .stApp::after {
+        content: "";
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 0;
+        height: 0;
+        border-style: solid;
+        border-width: 150px 0 0 150px;
+        border-color: transparent transparent transparent #fece00;
+        z-index: 0;
+        opacity: 0.8;
+    }
+
     /* INPUT TEXT AREA */
     .stTextArea textarea {
-        background-color: #2d2d2d;
-        color: #ffffff;
-        border: 1px solid #444;
-        border-radius: 4px;
+        background-color: #f0f0f0; /* Light gray for contrast against white */
+        color: #000000;
+        border: 2px solid #000000;
+        border-radius: 0px; /* Sharp corners for robust look */
+        font-family: 'Roboto', sans-serif;
     }
     .stTextArea textarea:focus {
         border-color: #fece00;
-        box-shadow: 0 0 5px #fece00;
+        box-shadow: 0 0 0 2px #fece00;
     }
-    
-    /* PRIMARY BUTTON (Gold/Yellow) */
+    .stTextArea label {
+        color: #000000 !important;
+        font-weight: 700;
+    }
+
+    /* PRIMARY BUTTON (Yellow with Black Text) */
     div.stButton > button:first-child {
         background-color: #fece00;
         color: #000000;
-        font-weight: 800;
+        font-family: 'Roboto', sans-serif;
+        font-weight: 900;
         font-size: 16px;
         text-transform: uppercase;
-        border-radius: 2px;
-        border: none;
-        padding: 10px 24px;
+        border-radius: 0px;
+        border: 2px solid #000000;
+        padding: 12px 28px;
+        box-shadow: 4px 4px 0px #000000; /* Retro shadow effect */
         transition: all 0.2s ease;
+        z-index: 1;
     }
     div.stButton > button:first-child:hover {
-        background-color: #e6b800;
+        transform: translate(2px, 2px);
+        box-shadow: 2px 2px 0px #000000;
+        background-color: #ffdb4d;
         color: #000000;
-        border: none;
-        transform: scale(1.02);
+        border: 2px solid #000000;
     }
-    
-    /* DOWNLOAD BUTTON (Outline/Dark) */
+
+    /* DOWNLOAD BUTTON */
     div.stDownloadButton > button:first-child {
-        background-color: transparent;
-        color: #fece00;
-        border: 2px solid #fece00;
+        background-color: #ffffff;
+        color: #000000;
+        border: 2px solid #000000;
+        font-family: 'Roboto', sans-serif;
         font-weight: 700;
         text-transform: uppercase;
+        border-radius: 0px;
+        box-shadow: 4px 4px 0px #fece00;
     }
     div.stDownloadButton > button:first-child:hover {
         background-color: #fece00;
         color: #000000;
+        transform: translate(2px, 2px);
+        box-shadow: 2px 2px 0px #000000;
     }
 
-    /* HEADERS */
+    /* HEADERS & TEXT */
     h1, h2, h3 {
-        color: #ffffff !important;
-        font-family: 'Arial Black', sans-serif;
+        color: #000000 !important;
+        font-family: 'Roboto', sans-serif;
+        font-weight: 900; /* Black weight */
         text-transform: uppercase;
-        letter-spacing: -0.5px;
+        letter-spacing: -1px;
     }
     
     /* DATAFRAME / TABLE */
     div[data-testid="stDataFrame"] {
-        background-color: #2d2d2d;
-        border: 1px solid #444;
+        border: 2px solid #000000;
+        background-color: #ffffff;
+    }
+    div[data-testid="stDataFrame"] div[class*="css"] {
+        color: #000000;
     }
 
-    /* PROGRESS BAR */
-    .stProgress > div > div > div > div {
-        background-color: #fece00;
+    /* ALERTS */
+    .stAlert {
+        background-color: #fff8cc; /* Light yellow bg */
+        color: #000000;
+        border: 2px solid #000000;
+        border-left: 10px solid #fece00;
     }
     
-    /* ALERTS/SUCCESS */
-    .stAlert {
-        background-color: #2d2d2d;
-        color: #fff;
-        border: 1px solid #444;
+    /* PROGRESS BAR */
+    .stProgress > div > div > div > div {
+        background-color: #000000;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -156,7 +213,7 @@ def search_onefc_link(query):
     try:
         r = session.get(search_url, timeout=10)
         soup = BeautifulSoup(r.content, 'html.parser')
-        main_area = soup.find('main') or soup.body
+        main_area = soup.find('main') or soup.find('div', id='content') or soup.body
         links = main_area.find_all('a', href=True)
         for link in links:
             href = link['href']
@@ -235,9 +292,9 @@ def fetch_athlete_data(url):
 # 3. UI LAYOUT
 # ==========================================
 
-# Add a Logo or Branding Header (Optional, using text for now)
-st.markdown("<h1 style='color: #fece00; font-size: 3em;'>ATHLETE DATA EXTRACTOR</h1>", unsafe_allow_html=True)
-st.markdown("Enter a list of athlete names or profile URLs below to extract multilingual data.", unsafe_allow_html=True)
+# Add a Logo or Branding Header
+st.markdown("<h1 style='color: #000000; font-size: 3em;'>ATHLETE DATA EXTRACTOR</h1>", unsafe_allow_html=True)
+st.markdown("<p style='font-size: 1.1em;'>Enter a list of athlete names or profile URLs below to extract multilingual data.</p>", unsafe_allow_html=True)
 
 st.write("") # Spacer
 
@@ -249,7 +306,6 @@ input_raw = st.text_area(
 
 st.write("") # Spacer
 
-# Using columns to center the button if desired, or keep it full width
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     search_clicked = st.button("SEARCH ATHLETES", type="primary", use_container_width=True)
@@ -303,12 +359,10 @@ if search_clicked:
         # --- PHASE 2: RETRY PASS ---
         if retry_queue:
             status.markdown(f"⏳ **RETRYING {len(retry_queue)} FAILED ITEMS...**")
-            time.sleep(1) # Give server a tiny break
+            time.sleep(1) 
             
             for i, entry in enumerate(retry_queue):
                 status.markdown(f"**RETRY SCAN:** `{entry}`")
-                
-                # Try search again (sometimes effective if network blipped)
                 url = search_onefc_link(entry)
                 
                 if url:
@@ -335,7 +389,6 @@ if search_clicked:
         # --- DISPLAY ---
         if master_data:
             df = pd.DataFrame(master_data)
-            # Reorder for better view
             df = df[["Name", "Nickname", "Country", "TH", "JP", "SC", "URL"]]
             
             st.markdown("### EXTRACTED DATA")
