@@ -230,7 +230,9 @@ if run_search:
     else:
         # Split by comma OR newline to be safe
         entries = [e.strip() for e in re.split(r'[,\n]', input_raw) if e.strip()]
-        entries = list(set(entries))
+        
+        # 1. Deduplicate but PRESERVE ORDER
+        entries = list(dict.fromkeys(entries))
         
         master_data = []
         retry_queue = []
@@ -255,6 +257,7 @@ if run_search:
                     sc_clean, _ = extract_nickname_and_clean(names.get('SC', ''))
                     
                     master_data.append({
+                        "order": i, # Track Original Index
                         "Name": en_clean,
                         "Nickname": nickname,
                         "Country": data['country'],
@@ -266,14 +269,17 @@ if run_search:
                     success = True
             
             if not success:
-                retry_queue.append(entry)
+                # Store (Index, Name) to preserve order after retry
+                retry_queue.append((i, entry))
+            
             progress_bar.progress((i + 1) / total_items)
 
         # --- PHASE 2 (Retry) ---
         if retry_queue:
             status.text(f"Retrying {len(retry_queue)} items...")
             time.sleep(1)
-            for i, entry in enumerate(retry_queue):
+            # Unpack the stored Index and Name
+            for original_idx, entry in retry_queue:
                 url = search_onefc_link(entry)
                 if url:
                     data = fetch_athlete_data(url)
@@ -285,6 +291,7 @@ if run_search:
                         sc_clean, _ = extract_nickname_and_clean(names.get('SC', ''))
                         
                         master_data.append({
+                            "order": original_idx, # Use Original Index
                             "Name": en_clean,
                             "Nickname": nickname,
                             "Country": data['country'],
@@ -297,6 +304,9 @@ if run_search:
         status.empty() # Clear status
         
         if master_data:
+            # Sort by the 'order' key to match input paste
+            master_data.sort(key=lambda x: x['order'])
+            
             # Force standard columns
             cols_standard = ["Name", "Nickname", "Country", "TH", "JP", "SC", "URL"]
             
@@ -304,6 +314,8 @@ if run_search:
             for col in cols_standard:
                 if col not in df.columns:
                     df[col] = ""
+            
+            # Select only standard columns (removes 'order')
             df = df[cols_standard]
             
             # --- HARDCODE ICONS INTO HEADERS ---
