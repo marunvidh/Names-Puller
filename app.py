@@ -13,7 +13,7 @@ import concurrent.futures
 # 0. PAGE CONFIGURATION
 # ==========================================
 st.set_page_config(
-    page_title="ONEFC Global Name Search",
+    page_title="ONE Championship Athlete Search",
     page_icon="🥊",
     layout="wide"
 )
@@ -41,37 +41,38 @@ st.markdown("""
         text-align: center;
         color: #888888;
         font-size: 1rem;
-        margin-bottom: 2rem;
+        margin-bottom: 0.5rem;
     }
-    
-    /* 3. INPUT BOX STYLING (High Contrast) */
-    .stTextArea textarea {
-        background-color: #262730 !important;
-        color: #ffffff !important; /* TEXT IS WHITE */
-        caret-color: #ffffff;
-        border: 1px solid #444;
-        border-radius: 8px;
-    }
-    .stTextArea textarea:focus {
-        border-color: #ff4b4b;
-        box-shadow: 0 0 0 1px #ff4b4b;
-    }
-    
-    /* 4. BUTTON STYLING & CENTERING */
-    div.stButton {
+    .instruction-text {
         text-align: center;
-        display: flex;
-        justify_content: center;
-        margin-top: 10px;
+        color: #bbbbbb;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+        font-style: italic;
     }
+    
+    /* 3. INPUT BOX STYLING */
+    div[data-baseweb="input"] > div {
+        background-color: #262730 !important;
+        color: #ffffff !important;
+        border: 1px solid #444;
+        border-radius: 4px;
+    }
+    input {
+        color: #ffffff !important; 
+    }
+    
+    /* 4. BUTTON STYLING (Full Height to match Input) */
     div.stButton > button:first-child {
         background-color: #ff4b4b;
         color: white;
         border: none;
-        padding: 0.5rem 2rem;
+        height: 2.6rem; /* Match standard input height */
+        padding: 0 2rem;
         border-radius: 4px;
         font-weight: bold;
-        width: 100%; 
+        width: 100%;
+        margin-top: 0px; 
     }
     div.stButton > button:first-child:hover {
         background-color: #ff3333;
@@ -202,31 +203,31 @@ def fetch_athlete_data(url):
     }
 
 # ==========================================
-# 3. UI LAYOUT (CENTERED)
+# 3. UI LAYOUT
 # ==========================================
 
-st.title("ONEFC Global Name Search")
-st.markdown('<p class="subtext">Input Names to start..</p>', unsafe_allow_html=True)
+st.title("ONE Championship Athlete Search")
+st.markdown('<p class="subtext">Search for ONE Championship athletes and get their names in multiple languages</p>', unsafe_allow_html=True)
+st.markdown('<p class="instruction-text">Enter athlete names (separate with commas):</p>', unsafe_allow_html=True)
 
-# --- CENTERED CONTAINER ---
-left, center, right = st.columns([1, 2, 1])
+# --- SEARCH ROW (Input + Button on same line) ---
+# Use a centered layout but with a wider ratio for the input box
+# [Spacer, Input Box (Large), Button (Small), Spacer]
+c1, c2, c3, c4 = st.columns([1, 6, 1, 1])
 
-with center:
-    input_raw = st.text_area(
-        "Search", 
-        value="", 
-        height=68, 
-        placeholder="", 
-        label_visibility="collapsed"
-    )
-    
+with c2:
+    # label_visibility="collapsed" hides the label to align perfectly with button
+    input_raw = st.text_input("Search", placeholder="e.g. Rodtang, Superlek", label_visibility="collapsed")
+
+with c3:
     run_search = st.button("SEARCH")
 
 # --- RESULTS AREA ---
 if run_search:
     if not input_raw.strip():
-        st.error("Please paste some names first.")
+        st.error("Please enter some names first.")
     else:
+        # Split by comma OR newline to be safe
         entries = [e.strip() for e in re.split(r'[,\n]', input_raw) if e.strip()]
         entries = list(set(entries))
         
@@ -315,7 +316,7 @@ if run_search:
                 "URL": "🔗 Link"
             })
             
-            # --- DISPLAY TABLE (With Icons & Clickable Links) ---
+            # --- DISPLAY TABLE (Auto Height & Clickable Links) ---
             st.dataframe(
                 df,
                 use_container_width=True,
