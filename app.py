@@ -13,13 +13,98 @@ import concurrent.futures
 # 0. PAGE CONFIGURATION
 # ==========================================
 st.set_page_config(
-    page_title="ONE Names Extractor (Creative)",
+    page_title="ONE Names Extractor",
     page_icon="🥊",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 # ==========================================
-# 1. NETWORK & LOGIC
+# 1. VISUAL STYLING (ONE CHAMPIONSHIP THEME)
+# ==========================================
+# This block injects Custom CSS to match the images provided
+st.markdown("""
+    <style>
+    /* MAIN BACKGROUND */
+    .stApp {
+        background-color: #1a1a1a;
+        color: #ffffff;
+    }
+    
+    /* INPUT TEXT AREA */
+    .stTextArea textarea {
+        background-color: #2d2d2d;
+        color: #ffffff;
+        border: 1px solid #444;
+        border-radius: 4px;
+    }
+    .stTextArea textarea:focus {
+        border-color: #fece00;
+        box-shadow: 0 0 5px #fece00;
+    }
+    
+    /* PRIMARY BUTTON (Gold/Yellow) */
+    div.stButton > button:first-child {
+        background-color: #fece00;
+        color: #000000;
+        font-weight: 800;
+        font-size: 16px;
+        text-transform: uppercase;
+        border-radius: 2px;
+        border: none;
+        padding: 10px 24px;
+        transition: all 0.2s ease;
+    }
+    div.stButton > button:first-child:hover {
+        background-color: #e6b800;
+        color: #000000;
+        border: none;
+        transform: scale(1.02);
+    }
+    
+    /* DOWNLOAD BUTTON (Outline/Dark) */
+    div.stDownloadButton > button:first-child {
+        background-color: transparent;
+        color: #fece00;
+        border: 2px solid #fece00;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    div.stDownloadButton > button:first-child:hover {
+        background-color: #fece00;
+        color: #000000;
+    }
+
+    /* HEADERS */
+    h1, h2, h3 {
+        color: #ffffff !important;
+        font-family: 'Arial Black', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: -0.5px;
+    }
+    
+    /* DATAFRAME / TABLE */
+    div[data-testid="stDataFrame"] {
+        background-color: #2d2d2d;
+        border: 1px solid #444;
+    }
+
+    /* PROGRESS BAR */
+    .stProgress > div > div > div > div {
+        background-color: #fece00;
+    }
+    
+    /* ALERTS/SUCCESS */
+    .stAlert {
+        background-color: #2d2d2d;
+        color: #fff;
+        border: 1px solid #444;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# 2. NETWORK & LOGIC
 # ==========================================
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -147,18 +232,29 @@ def fetch_athlete_data(url):
     }
 
 # ==========================================
-# 2. UI LAYOUT
+# 3. UI LAYOUT
 # ==========================================
 
-st.title("ONE Names Extractor (Creative)")
+# Add a Logo or Branding Header (Optional, using text for now)
+st.markdown("<h1 style='color: #fece00; font-size: 3em;'>ATHLETE DATA EXTRACTOR</h1>", unsafe_allow_html=True)
+st.markdown("Enter a list of athlete names or profile URLs below to extract multilingual data.", unsafe_allow_html=True)
+
+st.write("") # Spacer
 
 input_raw = st.text_area(
-    "Paste List (Names or URLs)", 
-    placeholder="Paste your names here",
-    height=150
+    "INPUT DATA (One per line)", 
+    placeholder="Rodtang Jitmuangnon\nSuperlek Kiatmoo9\nhttps://www.onefc.com/athletes/stamp-fairtex/",
+    height=200
 )
 
-if st.button("Search", type="primary"):
+st.write("") # Spacer
+
+# Using columns to center the button if desired, or keep it full width
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    search_clicked = st.button("SEARCH ATHLETES", type="primary", use_container_width=True)
+
+if search_clicked:
     if not input_raw.strip():
         st.error("⚠️ Please paste some names first.")
     else:
@@ -175,7 +271,7 @@ if st.button("Search", type="primary"):
         total_items = len(entries)
         
         for i, entry in enumerate(entries):
-            status.write(f"🔍 Pass 1: Scanning **{entry}**...")
+            status.markdown(f"**SCANNING:** `{entry}`")
             url = search_onefc_link(entry)
             
             success = False
@@ -206,11 +302,11 @@ if st.button("Search", type="primary"):
 
         # --- PHASE 2: RETRY PASS ---
         if retry_queue:
-            status.write(f"⏳ Retrying {len(retry_queue)} failed items...")
+            status.markdown(f"⏳ **RETRYING {len(retry_queue)} FAILED ITEMS...**")
             time.sleep(1) # Give server a tiny break
             
             for i, entry in enumerate(retry_queue):
-                status.write(f"🔄 Retry: Scanning **{entry}**...")
+                status.markdown(f"**RETRY SCAN:** `{entry}`")
                 
                 # Try search again (sometimes effective if network blipped)
                 url = search_onefc_link(entry)
@@ -234,7 +330,7 @@ if st.button("Search", type="primary"):
                             "URL": url
                         })
 
-        status.write("✅ Done!")
+        status.success("✅ **PROCESSING COMPLETE**")
         
         # --- DISPLAY ---
         if master_data:
@@ -242,10 +338,18 @@ if st.button("Search", type="primary"):
             # Reorder for better view
             df = df[["Name", "Nickname", "Country", "TH", "JP", "SC", "URL"]]
             
-            st.success(f"Found {len(df)} athletes.")
+            st.markdown("### EXTRACTED DATA")
             st.dataframe(df, use_container_width=True)
             
             csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Download CSV", csv, "onefc_data.csv", "text/csv")
+            
+            st.write("")
+            st.download_button(
+                "DOWNLOAD CSV FILE", 
+                csv, 
+                "onefc_data.csv", 
+                "text/csv",
+                use_container_width=True
+            )
         else:
-            st.error("No data found.")
+            st.error("No valid data found. Please check spelling or try direct URLs.")
